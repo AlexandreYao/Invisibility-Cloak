@@ -1,78 +1,69 @@
 import cv2
-import time
 import numpy as np
 
-## Preparation for writing the ouput video
-fourcc = cv2.VideoWriter_fourcc(*"XVID")
-out = cv2.VideoWriter("output.avi", fourcc, 20.0, (640, 480))
+# Fonction pour soustraire l'arrière-plan de l'objet avec effet de transparence
+def invisibility_effect(frame, background):
+    # Convertir l'image de l'objet et l'arrière-plan en images en niveaux de gris
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray_background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+    
+    # Soustraire l'arrière-plan de l'image de l'objet
+    diff = cv2.absdiff(gray_frame, gray_background)
+    
+    # Appliquer un seuil pour obtenir un masque binaire
+    _, mask = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+    
+    # Appliquer un flou gaussien à l'image de l'objet
+    blurred_frame = cv2.GaussianBlur(frame, (15, 15), 0)
+    
+    # Inverser le masque
+    mask_inv = cv2.bitwise_not(mask)
+    
+    # Remplacer les pixels de l'objet par ceux de l'arrière-plan flouté
+    result = cv2.bitwise_and(blurred_frame, blurred_frame, mask=mask_inv)
+    
+    return result
 
-##reading from the webcam
+# Capture vidéo à partir de la webcam
 cap = cv2.VideoCapture(0)
 
-## Allow the system to sleep for 3 seconds before the webcam starts
-time.sleep(3)
-count = 0
-background = 0
+# Capture de l'image de fond lorsque l'utilisateur appuie sur la touche "c"
+print("Appuyez sur 'c' pour capturer l'image de fond...")
 
-## Capture the background in range of 60
-for i in range(60):
-    ret, background = cap.read()
-background = np.flip(background, axis=1)
-
-## Read every frame from the webcam, until the camera is open
-while cap.isOpened():
-    ret, img = cap.read()
+while True:
+    ret, frame = cap.read()
     if not ret:
         break
-    count += 1
-    img = np.flip(img, axis=1)
+    
+    cv2.imshow('Background Capture', frame)
+    
+    # Sortir de la boucle si la touche 'c' est enfoncée
+    if cv2.waitKey(1) & 0xFF == ord('c'):
+        _, background = cap.read()
+        break
 
-    ## Convert the color space from BGR to HSV
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    ## Generat masks to detect red color
-    lower_red = np.array([0, 120, 50])
-    upper_red = np.array([10, 255, 255])
-    mask1 = cv2.inRange(hsv, lower_red, upper_red)
-
-    lower_red = np.array([170, 120, 70])
-    upper_red = np.array([180, 255, 255])
-    mask2 = cv2.inRange(hsv, lower_red, upper_red)
-
-    mask1 = mask1 + mask2
-
-    ## Open and Dilate the mask image
-    mask1 = cv2.morphologyEx(mask1, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-    mask1 = cv2.morphologyEx(mask1, cv2.MORPH_DILATE, np.ones((3, 3), np.uint8))
-
-    ## Create an inverted mask to segment out the red color from the frame
-    mask2 = cv2.bitwise_not(mask1)
-
-    ## Segment the red color part out of the frame using bitwise and with the inverted mask
-    res1 = cv2.bitwise_and(img, img, mask=mask2)
-
-    ## Create image showing static background frame pixels only for the masked region
-    res2 = cv2.bitwise_and(background, background, mask=mask1)
-
-    ## Generating the final output and writing
-    finalOutput = cv2.addWeighted(res1, 1, res2, 1, 0)
-    # out.write(finalOutput)
-    cv2.imshow("magic", finalOutput)
-    cv2.waitKey(1)
-
-
-cap.release()
-out.release()
+# Fermer la fenêtre de capture de fond
 cv2.destroyAllWindows()
 
+# Demande à l'utilisateur d'appuyer sur une touche pour commencer
+input("Appuyez sur une touche pour commencer...")
 
-# colors code
+while True:
+    # Lire le frame actuel de la webcam
+    ret, frame = cap.read()
+    if not ret:
+        break
+    
+    # Appliquer l'effet d'invisibilité avec effet de transparence
+    invisible_frame = invisibility_effect(frame, background)
+    
+    # Afficher le frame résultant
+    cv2.imshow('Invisibility Effect', invisible_frame)
+    
+    # Sortir de la boucle si la touche 'q' est enfoncée
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-# skin color
-# lower_red = np.array([0, 0, 70])
-# upper_red = np.array([100, 255,255])
-# mask1 = cv2.inRange(hsv, lower_red, upper_red)
-
-# lower_red = np.array([170, 120, 70])
-#  upper_red = np.array([180, 255, 255])
-# -----------------------
+# Libérer les ressources et fermer les fenêtres
+cap.release()
+cv2.destroyAllWindows()
